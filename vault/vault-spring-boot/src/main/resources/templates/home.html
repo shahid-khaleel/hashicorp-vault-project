@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: pagehead('Home - Vault Demo App')}"></head>
+<body>
+<div th:replace="~{fragments :: nav}"></div>
+
+<main class="container my-4">
+    <h1 class="mb-1" th:text="${appName}">Vault Demo App</h1>
+    <p class="text-muted">A minimal Spring Boot app for learning how services integrate with HashiCorp Vault.</p>
+
+    <div class="alert alert-danger" th:if="${error}">
+        <strong>Something's not right:</strong> <span th:text="${error}"></span>
+        <div class="small mt-1">This is expected if Vault just started, or if the vault-init step hasn't
+            finished yet - check <code>docker compose logs vault-init</code>.</div>
+    </div>
+
+    <div class="row g-3 mt-1">
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 status-card">
+                <div class="card-body">
+                    <h6 class="card-subtitle text-muted mb-2">Vault Status</h6>
+                    <span th:if="${vaultReachable}" class="badge bg-success">Reachable</span>
+                    <span th:unless="${vaultReachable}" class="badge bg-danger">Unreachable</span>
+                    <span th:if="${vaultReachable and vaultSealed}" class="badge bg-danger mt-1">Sealed</span>
+                    <span th:if="${vaultReachable and !vaultSealed}" class="badge bg-success mt-1">Unsealed</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 status-card">
+                <div class="card-body">
+                    <h6 class="card-subtitle text-muted mb-2">Authentication Status</h6>
+                    <span th:if="${authenticated}" class="badge bg-success">Authenticated</span>
+                    <span th:unless="${authenticated}" class="badge bg-secondary">Not Authenticated</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 status-card">
+                <div class="card-body">
+                    <h6 class="card-subtitle text-muted mb-2">Current Environment</h6>
+                    <span class="fw-semibold" th:text="${appEnv}">development</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 status-card">
+                <div class="card-body">
+                    <h6 class="card-subtitle text-muted mb-2">Connection Target</h6>
+                    <code class="small" th:text="${vaultAddr}">http://vault:8200</code>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <a th:href="@{/secrets}" class="btn btn-primary">View Secrets from Vault &rarr;</a>
+        <a th:href="@{/vault-info}" class="btn btn-outline-secondary">Vault Connection Details &rarr;</a>
+    </div>
+</main>
+
+<div th:replace="~{fragments :: footer}"></div>
+</body>
+</html>

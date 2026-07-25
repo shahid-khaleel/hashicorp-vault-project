@@ -1,0 +1,15 @@
+body {
+  background-color: #f7f7f9;
+}
+
+.status-card {
+  border-left: 4px solid #6c757d;
+}
+
+.secret-value {
+  font-family: monospace;
+}
+
+table code {
+  word-break: break-all;
+}

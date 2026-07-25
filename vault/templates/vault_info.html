@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Vault Info{% endblock %}
+{% block content %}
+
+<h1>Vault Information</h1>
+<p class="text-muted">Connection and authentication metadata - useful for understanding
+how this app is wired to Vault, and for troubleshooting.</p>
+
+{% if error %}
+<div class="alert alert-warning">Could not load token metadata: {{ error }}</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-body">
+    <table class="table">
+      <tr><th style="width: 30%">Vault Address</th><td><code>{{ vault_addr }}</code></td></tr>
+      <tr><th>Authentication Method</th><td>{{ auth_method }}</td></tr>
+      <tr><th>Secret Engine</th><td>KV Version 2, mounted at <code>{{ mount_point }}/</code></td></tr>
+      <tr><th>Secret Path</th><td><code>{{ mount_point }}/{{ secret_path }}/*</code></td></tr>
+      <tr>
+        <th>Token TTL</th>
+        <td>
+          {% if token_info %}
+            {{ token_info.ttl }} seconds remaining (max: {{ token_info.explicit_max_ttl or token_info.creation_ttl }}s)
+          {% else %}
+            <span class="text-muted">unavailable</span>
+          {% endif %}
+        </td>
+      </tr>
+      <tr>
+        <th>Token Policies</th>
+        <td>
+          {% if token_info %}
+            {% for p in token_info.policies %}<span class="badge bg-secondary me-1">{{ p }}</span>{% endfor %}
+          {% else %}
+            <span class="text-muted">unavailable</span>
+          {% endif %}
+        </td>
+      </tr>
+      <tr><th>Namespace</th><td>{{ namespace }}</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="alert alert-secondary mt-3 small">
+  This page calls Vault's <code>auth/token/lookup-self</code> endpoint - the same
+  thing <code>vault token lookup</code> does from the CLI - to show the
+  live TTL of the token this app is currently using.
+</div>
+
+{% endblock %}

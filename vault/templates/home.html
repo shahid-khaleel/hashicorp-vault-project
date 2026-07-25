@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Home - {{ app_name }}{% endblock %}
+{% block content %}
+
+<h1 class="mb-1">{{ app_name }}</h1>
+<p class="text-muted">A minimal app for learning how services integrate with HashiCorp Vault.</p>
+
+{% if error %}
+<div class="alert alert-danger">
+  <strong>Something's not right:</strong> {{ error }}
+  <div class="small mt-1">This is expected if Vault just started, or if the vault-init step hasn't
+  finished yet - check <code>docker compose logs vault-init</code>.</div>
+</div>
+{% endif %}
+
+<div class="row g-3 mt-1">
+
+  <div class="col-md-6 col-lg-3">
+    <div class="card h-100 status-card">
+      <div class="card-body">
+        <h6 class="card-subtitle text-muted mb-2">Vault Status</h6>
+        {% if vault_reachable %}
+          <span class="badge bg-success">Reachable</span>
+          {% if vault_sealed %}
+            <span class="badge bg-danger mt-1">Sealed</span>
+          {% else %}
+            <span class="badge bg-success mt-1">Unsealed</span>
+          {% endif %}
+        {% else %}
+          <span class="badge bg-danger">Unreachable</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6 col-lg-3">
+    <div class="card h-100 status-card">
+      <div class="card-body">
+        <h6 class="card-subtitle text-muted mb-2">Authentication Status</h6>
+        {% if authenticated %}
+          <span class="badge bg-success">Authenticated</span>
+        {% else %}
+          <span class="badge bg-secondary">Not Authenticated</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6 col-lg-3">
+    <div class="card h-100 status-card">
+      <div class="card-body">
+        <h6 class="card-subtitle text-muted mb-2">Current Environment</h6>
+        <span class="fw-semibold">{{ app_env }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6 col-lg-3">
+    <div class="card h-100 status-card">
+      <div class="card-body">
+        <h6 class="card-subtitle text-muted mb-2">Connection Target</h6>
+        <code class="small">{{ vault_addr }}</code>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="mt-4">
+  <a href="{{ url_for('secrets') }}" class="btn btn-primary">View Secrets from Vault &rarr;</a>
+  <a href="{{ url_for('vault_info') }}" class="btn btn-outline-secondary">Vault Connection Details &rarr;</a>
+</div>
+
+{% endblock %}

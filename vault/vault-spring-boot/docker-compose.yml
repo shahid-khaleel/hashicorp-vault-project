@@ -1,0 +1,63 @@
+# docker-compose.yml
+#
+# Same three-service pattern as the sibling Python project (vault +
+# vault-init + web), fully self-contained - separate network, separate
+# ports (Vault on 8300, app on 8080) so both projects can run side by
+# side without colliding.
+
+services:
+  vault:
+    image: hashicorp/vault:1.17
+    container_name: vault-demo-server-java
+    ports:
+      - "8300:8200"
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: "root"
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+      # The vault image defaults VAULT_ADDR to https://127.0.0.1:8200,
+      # which breaks the healthcheck against dev mode's plain-HTTP listener.
+      VAULT_ADDR: "http://127.0.0.1:8200"
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - ./vault:/vault-config:ro
+
+  vault-init:
+    image: hashicorp/vault:1.17
+    container_name: vault-demo-init-java
+    depends_on:
+      vault:
+        condition: service_healthy
+    environment:
+      VAULT_ADDR: "http://vault:8200"
+      VAULT_TOKEN: "root"
+    volumes:
+      - ./vault:/vault-config:ro
+      - vault-creds-java:/vault-creds
+    entrypoint: ["sh", "/vault-config/scripts/setup-all.sh"]
+
+  web:
+    build: .
+    container_name: vault-demo-web-java
+    depends_on:
+      vault-init:
+        condition: service_completed_successfully
+    ports:
+      - "8080:8080"
+    environment:
+      APP_NAME: "Vault Demo App (Spring Boot)"
+      APP_ENV: "development"
+      APP_VAULT_ADDRESS: "http://vault:8200"
+      APP_VAULT_AUTH_METHOD: "approle"
+      APP_VAULT_MOUNT_POINT: "secret"
+      APP_VAULT_SECRET_PATH: "vault-demo"
+    volumes:
+      - vault-creds-java:/vault-creds:ro
+
+volumes:
+  vault-creds-java:

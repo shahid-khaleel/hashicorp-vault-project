@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: pagehead('Vault Info - Vault Demo App')}"></head>
+<body>
+<div th:replace="~{fragments :: nav}"></div>
+
+<main class="container my-4">
+    <h1>Vault Information</h1>
+    <p class="text-muted">Connection and authentication metadata - useful for understanding
+        how this app is wired to Vault, and for troubleshooting.</p>
+
+    <div class="alert alert-warning" th:if="${error}">Could not load token metadata: <span th:text="${error}"></span></div>
+
+    <div class="card">
+        <div class="card-body">
+            <table class="table">
+                <tr><th style="width: 30%">Vault Address</th><td><code th:text="${vaultAddr}"></code></td></tr>
+                <tr><th>Authentication Method</th><td th:text="${authMethod}"></td></tr>
+                <tr><th>Secret Engine</th><td>KV Version 2, mounted at <code th:text="${mountPoint} + '/'"></code></td></tr>
+                <tr><th>Secret Path</th><td><code th:text="${mountPoint} + '/' + ${secretPath} + '/*'"></code></td></tr>
+                <tr>
+                    <th>Token TTL</th>
+                    <td th:if="${tokenInfo}" th:text="${tokenInfo.get('ttl')} + ' seconds remaining (max: ' + ${tokenInfo.get('explicit_max_ttl')} + 's)'"></td>
+                    <td th:unless="${tokenInfo}"><span class="text-muted">unavailable</span></td>
+                </tr>
+                <tr>
+                    <th>Token Policies</th>
+                    <td th:if="${tokenInfo}">
+                        <span class="badge bg-secondary me-1" th:each="p : ${tokenInfo.get('policies')}" th:text="${p}"></span>
+                    </td>
+                    <td th:unless="${tokenInfo}"><span class="text-muted">unavailable</span></td>
+                </tr>
+                <tr><th>Namespace</th><td th:text="${namespace}"></td></tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="alert alert-secondary mt-3 small">
+        This page calls Vault's <code>auth/token/lookup-self</code> endpoint via
+        <code>VaultTemplate.read(...)</code> - the same thing <code>vault token lookup</code>
+        does from the CLI - to show the live TTL of the token this app is currently using.
+    </div>
+</main>
+
+<div th:replace="~{fragments :: footer}"></div>
+</body>
+</html>

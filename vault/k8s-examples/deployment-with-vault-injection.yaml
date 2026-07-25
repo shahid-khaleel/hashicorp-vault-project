@@ -1,0 +1,68 @@
+# deployment-with-vault-injection.yaml
+#
+# NOT deployed by this project - this is a reference example showing how
+# the SAME app.py/vault_client.py code would get its secrets in a real
+# Kubernetes cluster, using the Vault Agent Sidecar Injector instead of
+# our docker-compose vault-init container.
+#
+# How it works:
+#   1. The Vault Agent Injector is a mutating webhook installed cluster-
+#      wide (via the Vault Helm chart). It watches for pods with the
+#      annotations below.
+#   2. When this Deployment's pod is created, the webhook injects an extra
+#      "vault-agent" container into the pod automatically - no changes to
+#      our application image needed.
+#   3. That sidecar authenticates to Vault using the pod's own Kubernetes
+#      ServiceAccount token (Kubernetes auth method - no role_id/secret_id
+#      to distribute at all), then fetches the secrets described by the
+#      annotations and renders them to files under /vault/secrets/ inside
+#      the shared pod filesystem.
+#   4. Our Flask container reads those files (or the env vars they were
+#      turned into) - conceptually identical to how docker-entrypoint.sh
+#      reads /vault-creds/ in this project, just with Vault Agent doing
+#      continuous rendering/renewal instead of a one-shot init container.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault-demo-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: vault-demo-app
+  template:
+    metadata:
+      labels:
+        app: vault-demo-app
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "vault-demo-app"
+        # Renders secret/data/vault-demo/database into a file at this path,
+        # using the given template, and re-renders it whenever the secret
+        # changes in Vault - this is how rotation reaches the pod with zero
+        # app restarts, same idea as our rotate-secret-demo.sh scenario.
+        vault.hashicorp.com/agent-inject-secret-database.txt: "secret/data/vault-demo/database"
+        vault.hashicorp.com/agent-inject-template-database.txt: |
+          {{- with secret "secret/data/vault-demo/database" -}}
+          DB_USERNAME={{ .Data.data.username }}
+          DB_PASSWORD={{ .Data.data.password }}
+          {{- end -}}
+    spec:
+      serviceAccountName: vault-demo-app
+      containers:
+        - name: web
+          image: vault-web:latest
+          ports:
+            - containerPort: 5000
+          env:
+            - name: VAULT_ADDR
+              value: "http://vault.vault.svc.cluster.local:8200"
+          # In this K8s model the app would read /vault/secrets/database.txt
+          # (written by the injected agent sidecar) instead of calling hvac
+          # itself - or it can still use hvac directly with Kubernetes auth,
+          # trading VAULT_ROLE_ID/VAULT_SECRET_ID for a JWT-based login.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-demo-app

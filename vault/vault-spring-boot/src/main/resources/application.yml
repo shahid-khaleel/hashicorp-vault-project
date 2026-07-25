@@ -1,0 +1,34 @@
+server:
+  port: 8080
+
+spring:
+  thymeleaf:
+    cache: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+# Every value here is overridable by an environment variable using Spring
+# Boot's relaxed binding, e.g. APP_VAULT_ROLE_ID -> app.vault.role-id.
+# docker-compose.yml sets these directly for the containerized app; a
+# local run can also use a .env-style application-local.yml (see
+# docs/02-development-setup.md).
+app:
+  name: "Vault Demo App (Spring Boot)"
+  env: "development"
+  vault:
+    address: "http://vault:8200"
+    namespace: ""
+    auth-method: "approle"
+    token: ""
+    role-id: ""
+    secret-id: ""
+    mount-point: "secret"
+    secret-path: "vault-demo"
+
+logging:
+  level:
+    com.example.vaultdemo: INFO

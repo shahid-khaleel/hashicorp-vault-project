@@ -1,0 +1,84 @@
+# docker-compose.yml
+#
+# Three services, wired to mirror a real (if tiny) secrets workflow:
+#
+#   vault      - the Vault server itself, running in DEV MODE. Dev mode
+#                auto-initializes and auto-unseals and creates a root
+#                token from VAULT_DEV_ROOT_TOKEN_ID - great for learning
+#                the APP side, terrible/forbidden for production (see
+#                vault/scripts/production-mode-demo.sh for the real flow).
+#
+#   vault-init - a one-shot job (not a long-running service) that logs in
+#                to Vault with the dev root token and runs
+#                vault/scripts/setup-all.sh: enables the KV engine, writes
+#                sample secrets, writes a least-privilege policy, enables
+#                AppRole, and creates a role - then writes that role's
+#                role_id/secret_id to a shared volume. This is the
+#                "someone/something provisions Vault" step a Platform or
+#                DevOps engineer would normally do via Terraform/CI.
+#
+#   web        - the Flask app. Waits for vault-init to finish
+#                successfully, reads the AppRole credentials vault-init
+#                produced (via docker-entrypoint.sh), authenticates to
+#                Vault itself, and serves the UI.
+
+services:
+  vault:
+    image: hashicorp/vault:1.17
+    container_name: vault-demo-server
+    ports:
+      - "8200:8200"
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: "root"
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+      # The vault image otherwise defaults VAULT_ADDR to https://127.0.0.1:8200,
+      # which breaks both our healthcheck and plain `vault status` (dev mode
+      # serves plain HTTP, not HTTPS).
+      VAULT_ADDR: "http://127.0.0.1:8200"
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    volumes:
+      # Mounted here too (not just on vault-init) so you can run the
+      # learning scripts by hand against the live container, e.g.:
+      #   docker exec vault-demo-server sh /vault-config/scripts/rotate-secret-demo.sh
+      - ./vault:/vault-config:ro
+
+  vault-init:
+    image: hashicorp/vault:1.17
+    container_name: vault-demo-init
+    depends_on:
+      vault:
+        condition: service_healthy
+    environment:
+      VAULT_ADDR: "http://vault:8200"
+      VAULT_TOKEN: "root"
+    volumes:
+      - ./vault:/vault-config:ro
+      - vault-creds:/vault-creds
+    entrypoint: ["sh", "/vault-config/scripts/setup-all.sh"]
+
+  web:
+    build: .
+    container_name: vault-demo-web
+    depends_on:
+      vault-init:
+        condition: service_completed_successfully
+    ports:
+      - "5000:5000"
+    environment:
+      APP_NAME: "Vault Demo App"
+      APP_ENV: "development"
+      VAULT_ADDR: "http://vault:8200"
+      VAULT_AUTH_METHOD: "approle"
+      VAULT_MOUNT_POINT: "secret"
+      VAULT_SECRET_PATH: "vault-demo"
+    volumes:
+      - vault-creds:/vault-creds:ro
+
+volumes:
+  vault-creds:
