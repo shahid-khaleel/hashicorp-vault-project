@@ -1,5 +1,6 @@
 # HashiCorp Vault Project
 
+[![Validate](https://github.com/shahid-khaleel/hashicorp-vault-project/actions/workflows/validate.yml/badge.svg)](https://github.com/shahid-khaleel/hashicorp-vault-project/actions/workflows/validate.yml)
 ![HashiCorp Vault](https://img.shields.io/badge/HashiCorp%20Vault-1.17-black?logo=vault&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-000000?logo=flask&logoColor=white)
@@ -264,6 +265,28 @@ implementations share the same failure modes — the Spring Boot app just
 reports them via Java stack traces where the Python app raises its own
 `Vault*Error` exceptions.
 
+## Continuous Integration
+
+[`.github/workflows/validate.yml`](.github/workflows/validate.yml) runs on
+every push and pull request against `main`. It is **credential-free and
+does not start either Docker Compose stack or talk to a real Vault
+server** — it only checks that the code and config in this repo are
+syntactically valid and buildable:
+
+| Job | What it checks |
+|---|---|
+| `python-lint` | Installs [`vault/requirements.txt`](vault/requirements.txt), runs `flake8` over `app.py` / `config.py` / `vault_client.py`, then `python -m py_compile` on the same files. No `tests/` directory or `test_*.py` files exist in this repo, so this job is lint + compile only, not a test run. |
+| `java-build` | `mvn -B compile` for the Spring Boot stack via `actions/setup-java` (Temurin 11, matching `pom.xml`). Compile only, not `package`/`test` — the `spring-boot-starter-test` dependency has no test classes behind it. |
+| `docker-compose-validate` | `docker compose -f <file> config` against both [`vault/docker-compose.yml`](vault/docker-compose.yml) and [`vault/vault-spring-boot/docker-compose.yml`](vault/vault-spring-boot/docker-compose.yml) — parses and resolves the YAML without starting any containers. |
+| `hadolint` | Lints both [`vault/Dockerfile`](vault/Dockerfile) and [`vault/vault-spring-boot/Dockerfile`](vault/vault-spring-boot/Dockerfile) for Dockerfile best-practice issues. |
+
+This is intentionally a **syntax/build gate, not an integration test
+suite** — it would not catch a broken AppRole login or a wrong Vault
+policy path, only things like a Python import error, a Java compile
+error, invalid Compose YAML, or a Dockerfile anti-pattern. See Known
+Issues below for what's still missing (no automated tests, no live-Vault
+integration testing in CI).
+
 ## Known Issues / Recommendations
 
 - **Fixed during this documentation pass:** `vault/.gitignore` had been
@@ -274,10 +297,14 @@ reports them via Java stack traces where the Python app raises its own
   stray `.pyc` files are removed from tracking.
 - **No automated tests** for either implementation (no `pytest`/`unittest`
   suite for the Flask app, no test classes beyond the unused
-  `spring-boot-starter-test` dependency for the Spring Boot app).
-- **No CI/CD.** There is no `.github/workflows` directory — builds, lint,
-  and the manual verification steps in the docs are not automated. This is
-  why no CI status badge appears above.
+  `spring-boot-starter-test` dependency for the Spring Boot app). CI (see
+  above) therefore lints and compiles but cannot exercise application
+  behavior.
+- **CI is syntax/build-only, not integration testing.** The GitHub Actions
+  workflow validates lint, compile, Compose YAML, and Dockerfiles, but
+  never boots either stack or a real Vault server — the manual
+  verification steps in the docs are still the only way to check the
+  actual Vault workflow end-to-end.
 - **No dependency/secret scanning** wired into the repo (e.g. Dependabot,
   `pip-audit`, `trivy`) — worth adding if this repo is used as a template
   for anything beyond learning.
@@ -305,7 +332,8 @@ by file while writing this documentation.
 What's honestly unfinished or out of scope, based on gaps visible in the
 code itself:
 
-- No CI pipeline, no automated tests (see Known Issues above).
+- CI covers lint/compile/config-validation only, no automated tests and
+  no live-Vault integration testing (see Known Issues above).
 - No Infrastructure-as-Code (Terraform) for Vault configuration — the docs
   describe this as the real-world approach but the repo itself only ships
   the equivalent shell scripts.

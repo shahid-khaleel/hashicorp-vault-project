@@ -1,0 +1,96 @@
+name: Validate
+
+# Lightweight CI: syntax/build/lint checks only. Nothing here talks to a
+# real Vault server or spins up the docker-compose stacks - see the
+# "Continuous Integration" section of the root README for what this
+# deliberately does NOT cover.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  python-lint:
+    name: Python lint (Flask stack)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vault
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install flake8
+
+      - name: Lint with flake8
+        # Line length raised from the flake8 default (79) to 120: the
+        # existing source uses longer lines in a few places and this repo's
+        # app code is intentionally left untouched by this CI pass.
+        run: flake8 --max-line-length=120 app.py config.py vault_client.py
+
+      - name: Byte-compile check
+        run: python -m py_compile app.py config.py vault_client.py
+
+      # No tests/ directory or test_*.py / *_test.py files exist anywhere
+      # in this repo (verified when this workflow was added), so this job
+      # is intentionally lint + compile only. If a test suite is added
+      # later, add a `pytest` step here.
+
+  java-build:
+    name: Java build (Spring Boot stack)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vault/vault-spring-boot
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "11"
+          cache: maven
+
+      - name: Compile with Maven
+        # `compile` only, not `package`/`test`: the only test dependency in
+        # pom.xml (spring-boot-starter-test) has no test classes behind it,
+        # and packaging isn't needed to prove the source compiles.
+        run: mvn -B compile
+
+  docker-compose-validate:
+    name: Docker Compose config validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Flask stack compose file
+        run: docker compose -f vault/docker-compose.yml config
+
+      - name: Validate Spring Boot stack compose file
+        run: docker compose -f vault/vault-spring-boot/docker-compose.yml config
+
+  hadolint:
+    name: Dockerfile lint (hadolint)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dockerfile:
+          - vault/Dockerfile
+          - vault/vault-spring-boot/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run hadolint on ${{ matrix.dockerfile }}
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: ${{ matrix.dockerfile }}
